@@ -1,0 +1,38 @@
+
+> web@0.1.0 build C:\Users\princ\3D Objects\ventorypoint\apps\web
+> next build
+
+▲ Next.js 16.3.8 (Turbopack)
+- Environments: .env.local
+✓ Running next.config.ts took 98ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 21.9s
+  Running TypeScript ...
+  Finished TypeScript in 11.1s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/12) ...
+  Generating static pages using 3 workers (3/12) 
+  Generating static pages using 3 workers (6/12) 
+  Generating static pages using 3 workers (9/12) 
+✓ Generating static pages using 3 workers (12/12) in 881ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /auth/callback
+├ ƒ /dashboard
+├ ƒ /dashboard/clients
+├ ƒ /dashboard/facilities
+├ ƒ /dashboard/members
+├ ƒ /login
+├ ƒ /onboarding
+└ ƒ /register
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

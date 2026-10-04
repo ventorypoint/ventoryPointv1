@@ -1,0 +1,100 @@
+/* Brand tokens — reference: rillet.com (adapted). Source of truth: tokens.json */
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap");
+:root{
+  --purple-50: #EBEEFF;
+  --purple-100: #DBDFFF;
+  --purple-200: #BFC4FF;
+  --purple-300: #989CFF;
+  --purple-400: #766FFF;
+  --purple-500: #644EFF;
+  --purple-600: #582EFD;
+  --purple-700: #4C22E0;
+  --purple-800: #392498;
+  --purple-900: #211452;
+  --violet-50: #F3F2F6;
+  --violet-100: #F3F2F6;
+  --violet-200: #E1DCED;
+  --violet-300: #C9C0EB;
+  --violet-400: #A694DC;
+  --violet-500: #876BC5;
+  --violet-600: #62478D;
+  --violet-700: #402F76;
+  --violet-800: #240257;
+  --violet-900: #15052B;
+  --gray-50: #FAFAFA;
+  --gray-100: #F4F4F5;
+  --gray-200: #E4E4E7;
+  --gray-300: #D4D4D8;
+  --gray-400: #A1A1AA;
+  --gray-500: #71717A;
+  --gray-600: #52525B;
+  --gray-700: #3F3F46;
+  --gray-800: #27272A;
+  --gray-900: #18181B;
+  --green-50: #EBF5EC;
+  --green-100: #CEF0D1;
+  --green-200: #A4DFAA;
+  --green-300: #7BD794;
+  --green-400: #49C47C;
+  --green-500: #39BB7C;
+  --green-600: #2AA666;
+  --green-700: #1F996C;
+  --green-800: #0D895C;
+  --green-900: #005133;
+  --amber-50: #F8EFDE;
+  --amber-100: #FCF0DA;
+  --amber-200: #F5DFB9;
+  --amber-300: #E8CA87;
+  --amber-400: #DFBD71;
+  --amber-500: #DDB04D;
+  --amber-600: #CA8A04;
+  --amber-700: #A16207;
+  --amber-800: #854D0E;
+  --amber-900: #713F12;
+  --red-50: #FEF2F2;
+  --red-600: #DC2626;
+  --red-700: #B91C1C;
+  --brand: #582EFD;
+  --text-primary: #18181B;
+  --text-secondary: rgba(24,24,27,0.8);
+  --border: #D4D4D8;
+  --surface: #F4F4F5;
+  --background: #FFFFFF;
+  --success: #1F996C;
+  --warning: #CA8A04;
+  --danger: #DC2626;
+  --info: #582EFD;
+  --button-primary-bg: #000000;
+  --button-primary-bg-hover: #582EFD;
+  --button-primary-text: #FFFFFF;
+  --floor-bg: #18181B;
+  --floor-text: #FAFAFA;
+  --gradient-dark-purple: linear-gradient(180deg, #211452, #392498);
+  --gradient-dark-violet: linear-gradient(180deg, #15052B, #240257);
+  --gradient-light-purple: linear-gradient(180deg, #DBDFFF, #EBEEFF);
+  --font-heading: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --radius-sm: 4px;
+  --radius-control: 6px;
+  --radius-md: 8px;
+  --radius-card: 12px;
+  --radius-panel: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+  --shadow-float: 0 24px 48px -12px rgba(17,17,20,0.18);
+  --shadow-glow: 0 3px 80px rgba(76,34,224,0.2);
+  --success-text: #005133;
+  --warning-text: #854D0E;
+  --danger-text: #B91C1C;
+  --focus-ring: #582EFD;
+}
+body{font-family:var(--font-body);color:var(--text-primary);background:var(--background);}
+h1,h2,h3,h4,h5,h6{font-family:var(--font-heading);font-weight:500;}
+.btn-primary{background:var(--button-primary-bg);color:var(--button-primary-text);border-radius:var(--radius-control);transition:background .2s;}
+.btn-primary:hover{background:var(--button-primary-bg-hover);}
+.section-dark{background:var(--gradient-dark-purple);color:#fff;}
+.eyebrow{font-family:var(--font-body);font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--brand);}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;}}
+@media (forced-colors: active){.btn-primary{border:1px solid ButtonText;}}

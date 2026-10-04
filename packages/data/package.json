@@ -1,0 +1,9 @@
+{
+  "name": "@ventorypoint/data",
+  "version": "0.1.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2",
+    "@supabase/ssr": "^0.12.7"
+  }
+}

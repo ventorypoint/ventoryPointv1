@@ -1,0 +1,227 @@
+Product Requirements Document (PRD)
+
+Phase 3 — Autonomous Operations & Collaborative Network (Months 12–24) · Sprint 7 of 15
+
+Sprint 7: AI Operations Copilot: Natural-Language Queries & Multilingual SOP Assistant
+
+Item
+
+Detail
+
+Parent document
+
+PRD — Modern 3PL Warehouse Operating System (v1.1), Section 6.4 (Phase 3 — "Autonomous Operations & Collaborative Network")
+
+Module
+
+AI Operations Copilot (Master PRD §6.4.5)
+
+Duration
+
+2 weeks (10 working days)
+
+Must be complete before starting
+
+Phase 3 · Sprint 6: Anomaly Detection & Anomaly-Driven Cycle Counting
+
+Unlocks next
+
+Phase 3 · Sprint 8: Multi-Facility Distributed Order Management & Inventory Transfers
+
+Version / Date / Status
+
+1.0 (Draft) · September 26, 2026 · Draft for review
+
+
+
+1. Objective & Scope
+
+The objective of this sprint is to match, and go beyond, the incumbent's conversational AI. Staff and brand users ask questions in plain language ("Where is order #8921?", "Which clients are below 80% on-time this week?") and get answers from live data. Workers ask SOP questions in their own language. Unlike the incumbent, the copilot sits alongside the autonomous engines (Sprints 2–6) and can explain their recommendations.
+
+By the end of this sprint:
+
+An in-app copilot answers operational questions over a governed semantic layer, with results as text, tables and quick charts.
+
+Every answer respects the user's permissions (RLS): brand users only ever get their own data.
+
+An SOP knowledge base (uploaded docs + platform help) answers how-to questions in 50+ languages, including in the floor workspace.
+
+The copilot can explain AI recommendations (why this route, box, slot, alert) using their logged reasons.
+
+Out of scope for this sprint: the copilot taking actions (releasing waves, editing orders) without an explicit confirm step (read-only + suggested actions in this sprint), voice interface on the floor.
+
+Dependency: Sprint 6 must be signed off (all engines log explainable reasons). Also uses the Sprint 1 analytics store / semantic layer and the Phase 2 · Sprint 6 portal.
+
+2. User Stories
+
+As a Supervisor, I want to ask 'what's still unpicked for the 2 PM UPS cutoff?' and get an answer instantly so that I don't build reports.
+
+As a Brand client, I want to ask 'what's my stock of SKU X across lots?' in the portal so that I get answers without emailing the 3PL.
+
+As a Floor Worker, I want to ask in Spanish how to handle a damaged return so that I follow the SOP correctly.
+
+As an Ops Manager, I want the copilot to explain why the system recommended a slot move so that I trust the AI.
+
+3. Functional Requirements
+
+3.1 Semantic Layer & Query Tools
+
+Governed metrics and entities (orders, shipments, inventory, locations, lots, serials, LPNs, picks, charges, cutoffs) with definitions. Includes the Phase 1 where_is and item_history services as tools (e.g. 'Where is serial 3582?', 'Which lots of SKU X expire this month and where are they?'). The LLM (Claude) uses tool calls against parameterised query functions, not free-form SQL on production.
+
+Every tool call runs as the requesting user (RLS/tenant filters enforced server-side). Query cost/row limits apply.
+
+3.2 Copilot Experience
+
+Chat panel in the web app and portal: answers with cited data (tables, links to records), quick charts, 'open in report' links, and suggested follow-ups.
+
+Suggested actions (e.g. 'Open the at-risk orders list', 'Create a count task') require explicit user confirmation and go through normal permissions.
+
+3.3 SOP Knowledge Assistant
+
+Upload SOPs/client instructions (PDF/DOCX), index them with retrieval, and answer with citations. Respond in the user's language (50+ languages).
+
+Floor workspace: a large 'Ask' button on any step, with a short answer + SOP snippet, in the worker's language.
+
+3.4 Explain-the-AI
+
+Tools that read logged reasons from routing, cartonization, slotting, SLA and anomaly engines and explain them in plain language.
+
+3.5 Safety & Quality
+
+Evaluation set of 300+ real questions with expected answers, run in CI. Refusal on out-of-scope requests. Conversation logs with PII minimisation. Admin toggles per role and per client.
+
+4. Acceptance Criteria
+
+On the evaluation set, ≥90% of operational questions are answered correctly with correct figures.
+
+A brand user asking about another brand's orders gets no data (tested adversarially, including prompt-injection attempts in order notes).
+
+A Spanish-language worker asking an SOP question gets a correct Spanish answer citing the right SOP section.
+
+Asking 'why this box?' on an order returns the cartonization reason consistent with the engine's log.
+
+Median answer time <4 seconds.
+
+5. Non-Functional & Security Requirements
+
+Requirement
+
+Detail
+
+Security
+
+Tool calls executed as the user. No cross-tenant retrieval. Prompt-injection defences on user-generated content (order notes, SOPs).
+
+Accuracy
+
+Numbers come only from tool results, never generated by the model. The evaluation suite gates releases.
+
+Cost
+
+Per-organization usage metering and limits (the copilot is included in tiers, with fair-use caps).
+
+Latency
+
+Median <4s, p95 <10s.
+
+6. Implementation Task Breakdown: Sprint 7
+
+The work runs in the steps below, in order, from the data layer up to the web UI.
+
+[Step 1: Semantic Layer] ──> [Step 2: Copilot UX] ──> [Step 3: SOP & Explain] ──> [Step 4: Eval & Safety]
+
+
+
+Step 1: Semantic Layer & Query Tools
+
+Goal: Give the model safe, governed access to data.
+
+Task 1.1: Metric & Entity Definitions
+
+Governed definitions, parameterised queries.
+
+Task 1.2: User-Scoped Tool Execution
+
+RLS/tenant enforcement, limits.
+
+Step 2: Copilot Chat in App & Portal
+
+Goal: Answer questions where users work.
+
+Task 2.1: Chat Panel & Answer Rendering
+
+Tables, charts, record links, follow-ups.
+
+Task 2.2: Confirmed Suggested Actions
+
+Explicit confirm, normal permissions.
+
+Step 3: SOP Assistant & Explain-the-AI
+
+Goal: Help workers follow SOPs and trust the AI.
+
+Task 3.1: SOP Indexing & Multilingual Answers
+
+Upload, retrieval, citations, floor 'Ask' button.
+
+Task 3.2: Explain Tools
+
+Engine reason readers.
+
+Step 4: Evaluation, Safety & Rollout
+
+Goal: Ship an assistant that's right and safe.
+
+Task 4.1: Evaluation Suite in CI
+
+300+ questions, accuracy gate.
+
+Task 4.2: Adversarial & Injection Testing
+
+Cross-tenant and injection tests.
+
+Task 4.3: Usage Metering & Role Toggles
+
+Limits, admin controls.
+
+7. Sprint Delivery Milestones
+
+Milestone 1 — Semantic Layer (Target: Day 3)
+
+Governed tools return correct, user-scoped data.
+
+Milestone 2 — Copilot UX (Target: Day 5)
+
+Chat live in app and portal.
+
+Milestone 3 — SOP & Explain (Target: Day 8)
+
+SOP answers in multiple languages. Engine explanations working.
+
+Milestone 4 — Eval & Sign-Off (Target: Day 10)
+
+Accuracy ≥90%. Adversarial tests pass.
+
+8. Open Questions Carried Into This Sprint
+
+Model selection and cost envelope per tier (e.g. a larger Claude model for complex analysis, a smaller one for SOP lookups).
+
+Is the copilot available to brand users on all tiers, or a Scale-tier feature?
+
+9. Definition of Done (Gate to the Next Sprint)
+
+All acceptance criteria in Section 4 pass and are demonstrated.
+
+Row Level Security tests exist and pass for every new table (including the Client User role where relevant).
+
+Non-functional targets in Section 5 are measured and met.
+
+Open questions in Section 8 are answered or explicitly deferred by the product owner.
+
+Sign-off recorded, so Phase 3 · Sprint 8 can start.
+
+
+
+End of Phase 3 · Sprint 7 PRD.
+
+Phase 3 — Autonomous Operations & Collaborative Network (Months 12–24)  |  Sprint 7 of 15  |  Page
