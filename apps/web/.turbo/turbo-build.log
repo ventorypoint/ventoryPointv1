@@ -4,18 +4,18 @@
 
 ▲ Next.js 16.3.8 (Turbopack)
 - Environments: .env.local
-✓ Running next.config.ts took 98ms
+✓ Running next.config.ts took 185ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 21.9s
+✓ Compiled successfully in 8.1s
   Running TypeScript ...
-  Finished TypeScript in 11.1s ...
+  Finished TypeScript in 8.8s ...
   Collecting page data using 3 workers ...
-  Generating static pages using 3 workers (0/12) ...
-  Generating static pages using 3 workers (3/12) 
-  Generating static pages using 3 workers (6/12) 
-  Generating static pages using 3 workers (9/12) 
-✓ Generating static pages using 3 workers (12/12) in 881ms
+  Generating static pages using 3 workers (0/20) ...
+  Generating static pages using 3 workers (5/20) 
+  Generating static pages using 3 workers (10/20) 
+  Generating static pages using 3 workers (15/20) 
+✓ Generating static pages using 3 workers (20/20) in 914ms
   Finalizing page optimization ...
 
 Route (app)
@@ -26,9 +26,17 @@ Route (app)
 ├ ƒ /dashboard/clients
 ├ ƒ /dashboard/facilities
 ├ ƒ /dashboard/members
+├ ƒ /dashboard/settings
+├ ƒ /floor-login
+├ ƒ /forgot-password
+├ ƒ /invite
+├ ○ /join
+├ ƒ /join/complete
 ├ ƒ /login
 ├ ƒ /onboarding
-└ ƒ /register
+├ ƒ /register
+├ ○ /reset-password
+└ ƒ /revoked
 
 
 ƒ Proxy (Middleware)

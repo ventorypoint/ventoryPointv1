@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-
 export async function createOrganization(formData: FormData) {
-  const name = formData.get("name") as string;
+  const name = ((formData.get("name") as string) || "").trim();
+  const country = (formData.get("country") as string) || null;
+  const timezone = (formData.get("timezone") as string) || "UTC";
+  const currency = (formData.get("currency") as string) || "USD";
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -16,40 +17,23 @@ export async function createOrganization(formData: FormData) {
     redirect("/login");
   }
 
-  // Create an admin client to bypass RLS for initial org setup
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  // 1. Create the organization
-  const { data: org, error: orgError } = await supabaseAdmin
-    .from("organizations")
-    .insert([{ name }])
-    .select()
-    .single();
-
-  if (orgError) {
-    return redirect(`/onboarding?message=${encodeURIComponent(orgError.message)}`);
+  if (!name) {
+    return redirect(`/onboarding?message=${encodeURIComponent("Organization name is required")}`);
   }
 
-  // 2. Add the user as the owner of the organization
-  const { error: memberError } = await supabaseAdmin
-    .from("organization_members")
-    .insert([{
-      organization_id: org.id,
-      user_id: user.id,
-      role: "owner",
-      is_active: true,
-      can_manage_all_members: true,
-      all_facilities: true
-    }]);
+  // Single transaction in the database: creates the org and makes the caller its Owner.
+  // No service-role key needed, the RPC derives the user from the session.
+  const { error } = await supabase.rpc("create_organization", {
+    p_name: name,
+    p_country: country,
+    p_timezone: timezone,
+    p_currency: currency,
+  });
 
-  if (memberError) {
-    return redirect(`/onboarding?message=${encodeURIComponent(memberError.message)}`);
+  if (error) {
+    return redirect(`/onboarding?message=${encodeURIComponent(error.message)}`);
   }
 
-  // 3. Redirect to the dashboard for this new org
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }

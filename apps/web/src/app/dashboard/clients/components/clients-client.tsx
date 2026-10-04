@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Search, Users, Mail, Phone, Building2, X, Trash2, Edit2 } from "lucide-react";
-import { createClientAccount, deleteClientAccount, updateClientAccount } from "../actions";
+import { Plus, Search, Users, Mail, Phone, Building2, X, Trash2, Edit2, PauseCircle, PlayCircle } from "lucide-react";
+import { createClientAccount, deleteClientAccount, updateClientAccount, setClientStatus } from "../actions";
 import { toast } from "sonner";
 import { ActionDropdown } from "@/components/ui/action-dropdown";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -17,6 +17,8 @@ type ClientAccount = {
   primary_contact_email: string | null;
   primary_contact_name: string | null;
   primary_contact_phone: string | null;
+  default_facility_id: string | null;
+  facility_ids: string[];
   organization_id: string;
 };
 
@@ -25,12 +27,20 @@ type Org = {
   name: string;
 };
 
+type Facility = {
+  id: string;
+  name: string;
+  organization_id: string;
+};
+
 export function ClientsClient({ 
   initialClients, 
-  organizations 
+  organizations,
+  facilities
 }: { 
   initialClients: ClientAccount[];
   organizations: Org[];
+  facilities: Facility[];
 }) {
   const [clients, setClients] = useState<ClientAccount[]>(initialClients);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,11 +74,31 @@ export function ClientsClient({
 
   const defaultOrgId = organizations.length === 1 ? organizations[0].id : "";
 
+  // Facility assignment form state
+  const [formOrgId, setFormOrgId] = useState(defaultOrgId);
+  const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
+  const [defaultFacilityId, setDefaultFacilityId] = useState("");
+
+  const orgFacilities = facilities.filter(f => f.organization_id === formOrgId);
+  const facilityName = (id: string) => facilities.find(f => f.id === id)?.name ?? "";
+
+  function toggleFacility(id: string) {
+    setSelectedFacilityIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      // Unchecking the default facility clears the default
+      if (!next.includes(defaultFacilityId)) setDefaultFacilityId("");
+      return next;
+    });
+  }
+
   function openEditModal(client: ClientAccount) {
     setEditingClient(client);
     setFormName(client.name);
     setFormShortCode(client.short_code);
     setIsShortCodeEdited(true);
+    setFormOrgId(client.organization_id);
+    setSelectedFacilityIds(client.facility_ids ?? []);
+    setDefaultFacilityId(client.default_facility_id ?? "");
     setIsModalOpen(true);
   }
 
@@ -77,6 +107,9 @@ export function ClientsClient({
     setFormName("");
     setFormShortCode("");
     setIsShortCodeEdited(false);
+    setFormOrgId(defaultOrgId);
+    setSelectedFacilityIds([]);
+    setDefaultFacilityId("");
     setIsModalOpen(true);
   }
 
@@ -87,6 +120,8 @@ export function ClientsClient({
       setFormName("");
       setFormShortCode("");
       setIsShortCodeEdited(false);
+      setSelectedFacilityIds([]);
+      setDefaultFacilityId("");
     }, 200);
   }
 
@@ -154,6 +189,17 @@ export function ClientsClient({
     }
   }
 
+  async function handleToggleStatus(client: ClientAccount) {
+    const next = client.status === 'active' ? 'suspended' : 'active';
+    const res = await setClientStatus(client.id, next);
+    if (res.error) {
+      toast.error(res.error);
+    } else {
+      toast.success(next === 'suspended' ? "Client suspended" : "Client reactivated");
+      setClients(clients.map(c => c.id === client.id ? { ...c, status: next } : c));
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -198,6 +244,7 @@ export function ClientsClient({
                 <th className="px-6 py-4 font-semibold">Client Name</th>
                 <th className="px-6 py-4 font-semibold">Code</th>
                 <th className="px-6 py-4 font-semibold">Status</th>
+                <th className="px-6 py-4 font-semibold">Facilities</th>
                 <th className="px-6 py-4 font-semibold">Primary Contact</th>
                 <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
@@ -205,7 +252,7 @@ export function ClientsClient({
             <tbody className="divide-y divide-border">
               {paginatedClients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <Building2 className="w-8 h-8 text-gray-300" />
                       <p>No client accounts found.</p>
@@ -236,6 +283,20 @@ export function ClientsClient({
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                      {client.facility_ids?.length ? (
+                        <span title={client.facility_ids.map(facilityName).join(", ")}>
+                          {client.facility_ids.length} {client.facility_ids.length === 1 ? "facility" : "facilities"}
+                          {client.default_facility_id && (
+                            <span className="block text-xs text-muted-foreground">
+                              Default: {facilityName(client.default_facility_id)}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">None assigned</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
                       {client.primary_contact_name ? (
                         <div className="flex flex-col">
                           <span className="font-medium">{client.primary_contact_name}</span>
@@ -252,6 +313,11 @@ export function ClientsClient({
                             label: "Edit",
                             icon: <Edit2 className="w-4 h-4" />,
                             onClick: () => openEditModal(client)
+                          },
+                          {
+                            label: client.status === 'active' ? "Suspend" : "Reactivate",
+                            icon: client.status === 'active' ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />,
+                            onClick: () => handleToggleStatus(client)
                           },
                           {
                             label: "Delete",
@@ -299,7 +365,12 @@ export function ClientsClient({
                   <SearchableSelect 
                     name="organization_id" 
                     required
-                    defaultValue={defaultOrgId}
+                    value={formOrgId}
+                    onChange={(val) => {
+                      setFormOrgId(val);
+                      setSelectedFacilityIds([]);
+                      setDefaultFacilityId("");
+                    }}
                     placeholder="Select Organization..."
                     options={organizations.map(org => ({ label: org.name, value: org.id }))}
                   />
@@ -337,6 +408,49 @@ export function ClientsClient({
                   className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand font-mono uppercase"
                 />
                 <p className="text-xs text-muted-foreground">Used as a prefix for orders and inventory (e.g., ACM-1004).</p>
+              </div>
+
+              <div className="pt-2 border-t border-border mt-4 space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Serving Facilities</h3>
+                {orgFacilities.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {formOrgId ? "No facilities yet. Create a facility first to assign it." : "Select an organization to see its facilities."}
+                  </p>
+                ) : (
+                  <>
+                    <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 space-y-1">
+                      {orgFacilities.map((f) => (
+                        <label key={f.id} className="flex items-center gap-2 text-sm px-1 py-0.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            name="facility_ids"
+                            value={f.id}
+                            checked={selectedFacilityIds.includes(f.id)}
+                            onChange={() => toggleFacility(f.id)}
+                          />
+                          {f.name}
+                        </label>
+                      ))}
+                    </div>
+                    {selectedFacilityIds.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Default Facility</label>
+                        <SearchableSelect
+                          name="default_facility_id"
+                          value={defaultFacilityId}
+                          onChange={setDefaultFacilityId}
+                          placeholder="No default"
+                          options={[
+                            { label: "No default", value: "" },
+                            ...orgFacilities
+                              .filter((f) => selectedFacilityIds.includes(f.id))
+                              .map((f) => ({ label: f.name, value: f.id })),
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               <div className="pt-2 border-t border-border mt-4">

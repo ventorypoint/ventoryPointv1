@@ -1,0 +1,241 @@
+"use client";
+
+import { useState, useRef, useEffect, useTransition } from "react";
+import { ChevronDown, Check, Building2, Warehouse, Globe, Plus } from "lucide-react";
+import Link from "next/link";
+import {
+  switchActiveOrganization,
+  switchActiveFacility,
+} from "@/lib/org-context";
+import type {
+  WorkspaceOrganization,
+  WorkspaceFacility,
+} from "@/lib/org-context-types";
+
+interface WorkspaceSwitcherProps {
+  organizations: WorkspaceOrganization[];
+  activeOrg: WorkspaceOrganization | null;
+  facilities: WorkspaceFacility[];
+  activeFacilityId: string;
+  isCollapsed?: boolean;
+}
+
+export function WorkspaceSwitcher({
+  organizations,
+  activeOrg,
+  facilities,
+  activeFacilityId,
+  isCollapsed = false,
+}: WorkspaceSwitcherProps) {
+  const [orgOpen, setOrgOpen] = useState(false);
+  const [facilityOpen, setFacilityOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const orgRef = useRef<HTMLDivElement>(null);
+  const facilityRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (orgRef.current && !orgRef.current.contains(event.target as Node)) {
+        setOrgOpen(false);
+      }
+      if (facilityRef.current && !facilityRef.current.contains(event.target as Node)) {
+        setFacilityOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectOrg = (orgId: string) => {
+    if (orgId === activeOrg?.id) {
+      setOrgOpen(false);
+      return;
+    }
+    setOrgOpen(false);
+    startTransition(async () => {
+      await switchActiveOrganization(orgId);
+    });
+  };
+
+  const handleSelectFacility = (facId: string) => {
+    if (facId === activeFacilityId) {
+      setFacilityOpen(false);
+      return;
+    }
+    setFacilityOpen(false);
+    startTransition(async () => {
+      await switchActiveFacility(facId);
+    });
+  };
+
+  const activeFacility =
+    activeFacilityId === "all"
+      ? null
+      : facilities.find((f) => f.id === activeFacilityId);
+
+  if (isCollapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-2 px-1">
+        <div
+          title={`${activeOrg?.name || "Organization"} (${activeOrg?.role || "Member"})`}
+          className="w-9 h-9 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground font-bold text-xs shadow-sm cursor-pointer"
+          onClick={() => setOrgOpen(!orgOpen)}
+        >
+          {activeOrg?.name?.slice(0, 2).toUpperCase() || "VP"}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 py-2 space-y-2 border-b border-border">
+      {/* Organization Switcher Dropdown */}
+      <div className="relative" ref={orgRef}>
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => {
+            setOrgOpen(!orgOpen);
+            setFacilityOpen(false);
+          }}
+          className="w-full flex items-center justify-between p-2 rounded-lg bg-surface hover:bg-surface-hover border border-border text-left transition-colors group cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-xs shrink-0">
+              <Building2 className="w-4 h-4 text-brand" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-foreground truncate">
+                {activeOrg?.name || "Select Org"}
+              </div>
+              <div className="text-[10px] text-muted-foreground capitalize flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                {activeOrg?.role?.replace("_", " ") || "Member"}
+              </div>
+            </div>
+          </div>
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 shrink-0 ${
+              orgOpen ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {orgOpen && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-background border border-border rounded-xl shadow-xl py-1.5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Your Workspaces
+            </div>
+            <div className="max-h-48 overflow-y-auto py-1">
+              {organizations.map((org) => {
+                const isSelected = org.id === activeOrg?.id;
+                return (
+                  <button
+                    key={org.id}
+                    type="button"
+                    onClick={() => handleSelectOrg(org.id)}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 text-xs text-left hover:bg-surface-hover transition-colors ${
+                      isSelected ? "text-brand font-semibold bg-brand/5" : "text-foreground"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">{org.name}</div>
+                      <div className="text-[10px] text-muted-foreground capitalize">
+                        {org.role.replace("_", " ")}
+                      </div>
+                    </div>
+                    {isSelected && <Check className="w-3.5 h-3.5 text-brand shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-border mt-1 pt-1 px-1">
+              <Link
+                href="/onboarding"
+                onClick={() => setOrgOpen(false)}
+                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs font-medium text-brand hover:bg-brand/10 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create New Organization</span>
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Facility Scope Switcher */}
+      <div className="relative" ref={facilityRef}>
+        <button
+          type="button"
+          disabled={isPending || facilities.length === 0}
+          onClick={() => {
+            setFacilityOpen(!facilityOpen);
+            setOrgOpen(false);
+          }}
+          className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-background hover:bg-surface border border-border/70 text-left transition-colors group cursor-pointer"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Warehouse className="w-3.5 h-3.5 text-brand/70 shrink-0" />
+            <div className="text-[11px] font-medium text-foreground truncate">
+              {activeFacility ? `${activeFacility.name} (${activeFacility.code})` : "All Facilities (HQ)"}
+            </div>
+          </div>
+          <ChevronDown
+            className={`w-3 h-3 text-muted-foreground transition-transform duration-200 shrink-0 ${
+              facilityOpen ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {facilityOpen && (
+          <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-background border border-border rounded-xl shadow-xl py-1.5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <span>Facility Scope</span>
+              <span className="text-[9px] font-normal">{facilities.length} active</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSelectFacility("all")}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-left hover:bg-surface-hover transition-colors ${
+                activeFacilityId === "all" ? "text-brand font-semibold bg-brand/5" : "text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Globe className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="truncate">All Facilities (HQ Overview)</span>
+              </div>
+              {activeFacilityId === "all" && <Check className="w-3.5 h-3.5 text-brand shrink-0" />}
+            </button>
+
+            <div className="max-h-40 overflow-y-auto py-1 border-t border-border/50">
+              {facilities.map((fac) => {
+                const isSelected = fac.id === activeFacilityId;
+                return (
+                  <button
+                    key={fac.id}
+                    type="button"
+                    onClick={() => handleSelectFacility(fac.id)}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-left hover:bg-surface-hover transition-colors ${
+                      isSelected ? "text-brand font-semibold bg-brand/5" : "text-foreground"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 pr-2">
+                      <div className="truncate">{fac.name}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {fac.code} {fac.city ? `• ${fac.city}` : ""}
+                      </div>
+                    </div>
+                    {isSelected && <Check className="w-3.5 h-3.5 text-brand shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,13 +1,46 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Plus, Search, Building, MapPin, Clock, X, Trash2, Edit2 } from "lucide-react";
-import { createFacility, deleteFacility, updateFacility } from "../actions";
+import { Plus, Search, Building, MapPin, Clock, X, Trash2, Edit2, LocateFixed, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { createFacility, deleteFacility, updateFacility, geocodeAddress } from "../actions";
 import { toast } from "sonner";
 import { ActionDropdown } from "@/components/ui/action-dropdown";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Modal } from "@/components/ui/modal";
+
+const DAYS = [
+  { key: "mon", label: "Monday" },
+  { key: "tue", label: "Tuesday" },
+  { key: "wed", label: "Wednesday" },
+  { key: "thu", label: "Thursday" },
+  { key: "fri", label: "Friday" },
+  { key: "sat", label: "Saturday" },
+  { key: "sun", label: "Sunday" },
+];
+
+type Hours = Record<string, { closed: boolean; open: string; close: string }>;
+type Cutoff = { carrier: string; time: string };
+type Geo = {
+  city: string;
+  state: string;
+  zip_code: string;
+  county: string;
+  country: string;
+  latitude: string;
+  longitude: string;
+  geocode_status: "verified" | "manual" | "unverified";
+};
+
+const emptyGeo: Geo = {
+  city: "", state: "", zip_code: "", county: "", country: "",
+  latitude: "", longitude: "", geocode_status: "unverified",
+};
+
+const defaultHours = (): Hours =>
+  Object.fromEntries(
+    DAYS.map((d) => [d.key, { closed: d.key === "sat" || d.key === "sun", open: "08:00", close: "17:00" }])
+  );
 
 type Facility = {
   id: string;
@@ -15,6 +48,16 @@ type Facility = {
   short_code: string;
   timezone: string;
   address: string;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+  county: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocode_status: "verified" | "manual" | "unverified" | null;
+  operating_hours: Hours | null;
+  carrier_cutoffs: Cutoff[] | null;
   organization_id: string;
   created_at: string;
 };
@@ -59,6 +102,71 @@ export function FacilitiesClient({
   const [formShortCode, setFormShortCode] = useState("");
   const [isShortCodeEdited, setIsShortCodeEdited] = useState(false);
 
+  // Structured address / geocoding / schedule state
+  const [address, setAddress] = useState("");
+  const [geo, setGeo] = useState<Geo>(emptyGeo);
+  const [hours, setHours] = useState<Hours>(defaultHours());
+  const [cutoffs, setCutoffs] = useState<Cutoff[]>([]);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  function loadFormExtras(f: Facility | null) {
+    setAddress(f?.address ?? "");
+    setGeo(
+      f
+        ? {
+            city: f.city ?? "",
+            state: f.state ?? "",
+            zip_code: f.zip_code ?? "",
+            county: f.county ?? "",
+            country: f.country ?? "",
+            latitude: f.latitude?.toString() ?? "",
+            longitude: f.longitude?.toString() ?? "",
+            geocode_status: f.geocode_status ?? "unverified",
+          }
+        : emptyGeo
+    );
+    setHours(f?.operating_hours && Object.keys(f.operating_hours).length ? { ...defaultHours(), ...f.operating_hours } : defaultHours());
+    setCutoffs(f?.carrier_cutoffs ?? []);
+  }
+
+  async function handleVerifyAddress() {
+    const query = [address, geo.city, geo.state, geo.zip_code].filter(Boolean).join(", ");
+    setIsGeocoding(true);
+    const res = await geocodeAddress(query);
+    setIsGeocoding(false);
+    if (!res.ok) {
+      setGeo((g) => ({ ...g, geocode_status: "unverified" }));
+      toast.error(res.error);
+      return;
+    }
+    setGeo({
+      city: res.city ?? "",
+      state: res.state ?? "",
+      zip_code: res.zip_code ?? "",
+      county: res.county ?? "",
+      country: res.country ?? "",
+      latitude: res.latitude.toFixed(6),
+      longitude: res.longitude.toFixed(6),
+      geocode_status: "verified",
+    });
+    toast.success("Address found. Confirm the pin on the map.");
+  }
+
+  const hasCoords = geo.latitude !== "" && geo.longitude !== "" && !isNaN(Number(geo.latitude)) && !isNaN(Number(geo.longitude));
+  const mapSrc = hasCoords
+    ? (() => {
+        const lat = Number(geo.latitude);
+        const lon = Number(geo.longitude);
+        const d = 0.006;
+        return `https://www.openstreetmap.org/export/embed.html?bbox=${lon - d},${lat - d},${lon + d},${lat + d}&layer=mapnik&marker=${lat},${lon}`;
+      })()
+    : null;
+
+  // If the user hand-edits coordinates, the pin is no longer "verified" by the geocoder
+  function setCoord(key: "latitude" | "longitude", value: string) {
+    setGeo((g) => ({ ...g, [key]: value, geocode_status: value === "" && (key === "latitude" ? g.longitude : g.latitude) === "" ? "unverified" : "manual" }));
+  }
+
   // If the user only has one org, we can default to it
   const defaultOrgId = organizations.length === 1 ? organizations[0].id : "";
 
@@ -67,6 +175,7 @@ export function FacilitiesClient({
     setFormName(facility.name);
     setFormShortCode(facility.short_code);
     setIsShortCodeEdited(true);
+    loadFormExtras(facility);
     setIsModalOpen(true);
   }
 
@@ -75,6 +184,7 @@ export function FacilitiesClient({
     setFormName("");
     setFormShortCode("");
     setIsShortCodeEdited(false);
+    loadFormExtras(null);
     setIsModalOpen(true);
   }
 
@@ -224,9 +334,27 @@ export function FacilitiesClient({
                         {facility.short_code}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span className="truncate max-w-[200px]">{facility.address || '—'}</span>
+                    <td className="px-6 py-4 text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate max-w-[200px]">{facility.address || '—'}</span>
+                          {(facility.city || facility.state || facility.zip_code) && (
+                            <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {[facility.city, facility.state].filter(Boolean).join(", ")} {facility.zip_code}
+                            </span>
+                          )}
+                        </div>
+                        {facility.latitude !== null && facility.geocode_status !== 'unverified' ? (
+                          <span title={facility.geocode_status === 'verified' ? 'Address verified' : 'Pin set manually'}>
+                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                          </span>
+                        ) : facility.address ? (
+                          <span title="Address not verified. Edit the facility and verify it.">
+                            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-600">
                       <div className="flex items-center gap-2">
@@ -280,6 +408,7 @@ export function FacilitiesClient({
         isOpen={isModalOpen} 
         onClose={handleCloseModal} 
         title={editingFacility ? "Edit Facility" : "Add New Facility"}
+        maxWidth="max-w-2xl"
       >
         <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
               {organizations.length > 1 && !editingFacility && (
@@ -345,14 +474,175 @@ export function FacilitiesClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Street address</label>
                 <textarea 
                   name="address" 
-                  defaultValue={editingFacility?.address || ""}
-                  placeholder="Full street address..."
-                  rows={3}
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    // Editing the address invalidates any previous verification
+                    setGeo((g) => (g.geocode_status === "verified" ? { ...g, geocode_status: "unverified" } : g));
+                  }}
+                  placeholder="Street, building number..."
+                  rows={2}
                   className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand resize-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">City</label>
+                  <input name="city" value={geo.city} onChange={(e) => setGeo({ ...geo, city: e.target.value })} className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">State</label>
+                  <input name="state" value={geo.state} onChange={(e) => setGeo({ ...geo, state: e.target.value })} className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">ZIP code</label>
+                  <input name="zip_code" value={geo.zip_code} onChange={(e) => setGeo({ ...geo, zip_code: e.target.value })} className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-600 dark:text-gray-400">County</label>
+                  <input name="county" value={geo.county} onChange={(e) => setGeo({ ...geo, county: e.target.value })} className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand" />
+                </div>
+              </div>
+              <input type="hidden" name="country" value={geo.country} />
+              <input type="hidden" name="geocode_status" value={geo.geocode_status} />
+
+              {/* Geocoding + pin confirmation */}
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">Location pin</div>
+                    <div className="text-xs text-muted-foreground">
+                      {geo.geocode_status === "verified"
+                        ? "Address verified. Confirm the pin below."
+                        : geo.geocode_status === "manual"
+                        ? "Pin set manually."
+                        : "Not verified yet."}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleVerifyAddress}
+                    disabled={isGeocoding}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-border rounded-md hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-50 cursor-pointer"
+                  >
+                    <LocateFixed className="w-4 h-4" />
+                    {isGeocoding ? "Verifying..." : "Verify address"}
+                  </button>
+                </div>
+
+                {mapSrc && (
+                  <iframe
+                    title="Facility location"
+                    src={mapSrc}
+                    className="w-full h-48 rounded-md border border-border"
+                    loading="lazy"
+                  />
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Latitude</label>
+                    <input name="latitude" inputMode="decimal" value={geo.latitude} onChange={(e) => setCoord("latitude", e.target.value)} placeholder="e.g. 34.052235" className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand font-mono" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Longitude</label>
+                    <input name="longitude" inputMode="decimal" value={geo.longitude} onChange={(e) => setCoord("longitude", e.target.value)} placeholder="e.g. -118.243683" className="w-full px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand font-mono" />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Pin in the wrong spot? Adjust the coordinates and the map updates.
+                </p>
+                {geo.geocode_status === "unverified" && address.trim() && (
+                  <p className="flex items-center gap-1.5 text-xs text-yellow-600 dark:text-yellow-400">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    This address is unverified and will be flagged until you verify it.
+                  </p>
+                )}
+              </div>
+
+              {/* Operating hours */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Operating hours</label>
+                <div className="border border-border rounded-lg divide-y divide-border">
+                  {DAYS.map((d) => (
+                    <div key={d.key} className="flex items-center gap-3 px-3 py-2 text-sm">
+                      <span className="w-24 text-gray-700 dark:text-gray-300">{d.label}</span>
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hours[d.key].closed}
+                          onChange={(e) => setHours({ ...hours, [d.key]: { ...hours[d.key], closed: e.target.checked } })}
+                        />
+                        Closed
+                      </label>
+                      <input
+                        type="time"
+                        value={hours[d.key].open}
+                        disabled={hours[d.key].closed}
+                        onChange={(e) => setHours({ ...hours, [d.key]: { ...hours[d.key], open: e.target.value } })}
+                        className="ml-auto px-2 py-1 border border-border rounded-md disabled:opacity-40"
+                      />
+                      <span className="text-muted-foreground">–</span>
+                      <input
+                        type="time"
+                        value={hours[d.key].close}
+                        disabled={hours[d.key].closed}
+                        onChange={(e) => setHours({ ...hours, [d.key]: { ...hours[d.key], close: e.target.value } })}
+                        className="px-2 py-1 border border-border rounded-md disabled:opacity-40"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <input type="hidden" name="operating_hours" value={JSON.stringify(hours)} />
+              </div>
+
+              {/* Carrier cutoffs */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Carrier cutoff times</label>
+                  <button
+                    type="button"
+                    onClick={() => setCutoffs([...cutoffs, { carrier: "", time: "16:00" }])}
+                    className="flex items-center gap-1 text-xs font-medium text-brand hover:underline cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add cutoff
+                  </button>
+                </div>
+                {cutoffs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No cutoffs yet. e.g. UPS Ground at 16:00 local time.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {cutoffs.map((c, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          value={c.carrier}
+                          onChange={(e) => setCutoffs(cutoffs.map((x, j) => (j === i ? { ...x, carrier: e.target.value } : x)))}
+                          placeholder="Carrier (e.g. UPS Ground)"
+                          className="flex-1 px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-brand"
+                        />
+                        <input
+                          type="time"
+                          value={c.time}
+                          onChange={(e) => setCutoffs(cutoffs.map((x, j) => (j === i ? { ...x, time: e.target.value } : x)))}
+                          className="px-2 py-2 text-sm border border-border rounded-md"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setCutoffs(cutoffs.filter((_, j) => j !== i))}
+                          className="p-2 text-gray-400 hover:text-red-500 cursor-pointer"
+                          title="Remove"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input type="hidden" name="carrier_cutoffs" value={JSON.stringify(cutoffs)} />
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-border mt-6">

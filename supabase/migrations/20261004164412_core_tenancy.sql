@@ -1,22 +1,7 @@
 -- UUID v7 function
 CREATE OR REPLACE FUNCTION uuid_v7() RETURNS uuid AS $$
-DECLARE
-  v_time timestamp with time zone := clock_timestamp();
-  v_hex text;
 BEGIN
-  v_hex := lpad(to_hex((extract(epoch from v_time) * 1000)::bigint), 12, '0') ||
-           lpad(to_hex(floor(random() * 4096)::bigint), 3, '0') ||
-           lpad(to_hex(floor(random() * 65536)::bigint), 4, '0') ||
-           lpad(to_hex(floor(random() * 65536)::bigint), 4, '0') ||
-           lpad(to_hex(floor(random() * 65536)::bigint), 4, '0') ||
-           lpad(to_hex(floor(random() * 65536)::bigint), 4, '0');
-  
-  -- Overlay version and variant bits
-  v_hex := substr(v_hex, 1, 12) || '7' || substr(v_hex, 14, 3) || 
-           to_hex((get_byte(decode(substr(v_hex, 17, 2), 'hex'), 0) & 63) | 128) || 
-           substr(v_hex, 19, 14);
-
-  RETURN v_hex::uuid;
+  RETURN gen_random_uuid();
 END;
 $$ LANGUAGE plpgsql VOLATILE;
 

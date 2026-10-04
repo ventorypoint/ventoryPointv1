@@ -25,20 +25,32 @@ export default async function ClientsPage() {
   
   // Format organizations for the client
   const organizations = members
-    .map((m: any) => m.organizations)
-    .filter((org: any): org is { id: string; name: string } => org !== null);
+    .map((m: any) => (Array.isArray(m.organizations) ? m.organizations[0] : m.organizations))
+    .filter((org: any): org is { id: string; name: string } => org !== null && org !== undefined);
 
   // Fetch client accounts for these organizations
   const { data: clients } = await supabase
     .from("client_accounts")
-    .select("*")
+    .select("*, client_facilities(facility_id)")
     .in("organization_id", orgIds)
     .order("created_at", { ascending: false });
 
+  const { data: facilities } = await supabase
+    .from("facilities")
+    .select("id, name, organization_id")
+    .in("organization_id", orgIds)
+    .order("name");
+
+  const formattedClients = (clients || []).map((c: any) => ({
+    ...c,
+    facility_ids: (c.client_facilities || []).map((cf: any) => cf.facility_id),
+  }));
+
   return (
     <ClientsClient 
-      initialClients={clients || []} 
+      initialClients={formattedClients} 
       organizations={organizations}
+      facilities={facilities || []}
     />
   );
 }
